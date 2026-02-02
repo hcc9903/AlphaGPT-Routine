@@ -36,15 +36,6 @@ HOLD_PERIOD = _get_env('HOLD_PERIOD', 11, int)     # 持仓周期（包含买入
 FORCE_TRAIN = _get_env('FORCE_TRAIN', False, bool)  # 若为False且存在本地公式，则直接加载；若为True则强制重新训练
 ONLY_LONG = _get_env('ONLY_LONG', True, bool)     # 是否仅做多，适配A股市场
 BEST_FORMULA = _get_env('BEST_FORMULA', '')       # 环境变量公式
-CODE_FORMULA = _get_env('CODE_FORMULA', '')       # 组合环境变量 (code:formula)
-
-print("len of code_formula = " + str(len(CODE_FORMULA)))
-
-# 解析 CODE_FORMULA
-if CODE_FORMULA and ':' in CODE_FORMULA:
-    parts = CODE_FORMULA.split(':', 1)
-    INDEX_CODE = parts[0]
-    BEST_FORMULA = parts[1]
 
 DINGTALK_WEBHOOK = _get_env('DINGTALK_WEBHOOK', '')
 DINGTALK_SECRET = _get_env('DINGTALK_SECRET', '')
@@ -1065,9 +1056,19 @@ def _fetch_margin_data_from_api(stock_code, date_list, cache_dir):
     return margin_data
 
 if __name__ == "__main__":
-    eng = DataEngine()
-    eng.load()
-    miner = DeepQuantMiner(eng)
-    miner.train()
-    # final_reality_check(miner, eng)
-    show_latest_positions(miner, eng, n_days=LAST_NDAYS)
+    global INDEX_CODE, BEST_FORMULA
+
+    CODE_FORMULA = _get_env('CODE_FORMULA', '')       # 组合环境变量 (code:formula)
+    cf_list = CODE_FORMULA.split('\n')
+    for cf in cf_list:
+        parts = cf.split(':', 1)
+        INDEX_CODE = parts[0]
+        BEST_FORMULA = parts[1]
+        print("code: " + INDEX_CODE + ", len of formula: " + str(len(BEST_FORMULA)))
+
+        eng = DataEngine()
+        eng.load()
+        miner = DeepQuantMiner(eng)
+        miner.train()
+        # final_reality_check(miner, eng)
+        show_latest_positions(miner, eng, n_days=LAST_NDAYS)

@@ -2,7 +2,7 @@ name: A-Stock AlphaGPT routine
 
 on:
   schedule:
-    - cron: '00 12 * * *' # Mon-Fri 18:30 Beijing time (10:30 UTC)
+    - cron: '13 8 * * *'
   workflow_dispatch:
 
 jobs:
