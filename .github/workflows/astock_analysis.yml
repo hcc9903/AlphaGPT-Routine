@@ -4,18 +4,29 @@ on:
   workflow_dispatch:
     inputs:
       stock_code:
-        description: '📈 请输入6位股票代码 (比如: 300912)'
+        description: '📈 请输入6位股票代码'
         required: true
         default: '300912'
-      my_formula:
-        description: '🧪 请输入你的黄金公式'
+      run_mode:
+        description: '选择模式: 挖掘新公式 (Mine) / 运行已有公式 (Run)'
         required: true
+        default: 'Run'  # 默认设为运行模式，省时间
+        type: choice
+        options:
+          - Mine
+          - Run
+      my_formula:
+        description: '🧪 如果选Run，请输入公式 (选Mine则留空)'
+        required: false
         default: 'SUB(DIV(VOL_CHG, ABS(TREND)), TREND)'
+      iterations:
+        description: '挖掘深度 (仅在Mine模式有效)'
+        required: true
+        default: '100'
 
 jobs:
   analyze:
     runs-on: ubuntu-latest
-    # 授予写入权限，以便能把两融数据缓存推送到仓库
     permissions:
       contents: write
       
@@ -35,23 +46,20 @@ jobs:
 
       - name: Run analysis
         env:
-          # 核心：将网页输入的中文参数传给 Python 脚本
           INDEX_CODE: ${{ github.event.inputs.stock_code }}
+          # 核心判定逻辑
+          FORCE_TRAIN: ${{ github.event.inputs.run_mode == 'Mine' && 'True' || 'False' }}
           BEST_FORMULA: ${{ github.event.inputs.my_formula }}
-          FORCE_TRAIN: 'False'
+          TRAIN_ITERATIONS: ${{ github.event.inputs.iterations }}
           
-          # 其他基础配置
           START_DATE: '20220101'
           END_DATE: '20270101'
           BATCH_SIZE: 1024
-          TRAIN_ITERATIONS: 100
           MAX_SEQ_LEN: 10
           COST_RATE: 0.0004
           LAST_NDAYS: 50
           HOLD_PERIOD: 11
           ONLY_LONG: 'True'
-          
-          # 敏感信息配置
           DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
           DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: python times_astock.py
@@ -60,8 +68,6 @@ jobs:
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          # 检查是否有两融数据更新，有则推送回仓库保存
-          if [ -d "margin_balance" ]; then
-            git add margin_balance/*.parquet
-            git diff --quiet && git diff --staged --quiet || (git commit -m "Update margin data [skip ci]" && git push)
-          fi
+          git add *.txt 2>/dev/null || true
+          if [ -d "margin_balance" ]; then git add margin_balance/*.parquet; fi
+          git diff --quiet && git diff --staged --quiet || (git commit -m "数据更新: ${INDEX_CODE} [skip ci]" && git push)
