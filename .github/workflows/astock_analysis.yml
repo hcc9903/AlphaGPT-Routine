@@ -1,7 +1,5 @@
 name: A-Stock AlphaGPT routine
 
-name: A-Stock AlphaGPT routine
-
 on:
   workflow_dispatch:
     inputs:
