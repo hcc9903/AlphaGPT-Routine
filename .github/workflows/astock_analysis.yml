@@ -1,16 +1,66 @@
 name: A-Stock AlphaGPT routine
 
+name: A-Stock AlphaGPT routine
+
 on:
   workflow_dispatch:
     inputs:
       stock_code:
-        description: '输入股票代码'
+        description: '📈 请输入6位股票代码 (比如: 300912)'
         required: true
         default: '300912'
       my_formula:
-        description: '输入你的黄金公式'
+        description: '🧪 请输入你的黄金公式'
         required: true
         default: 'SUB(DIV(VOL_CHG, ABS(TREND)), TREND)'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch pandas numpy akshare matplotlib pyarrow tqdm requests
+
+      - name: Run analysis
+        env:
+          # 这里把网页输入的中文参数传给 Python 脚本
+          INDEX_CODE: ${{ github.event.inputs.stock_code }}
+          BEST_FORMULA: ${{ github.event.inputs.my_formula }}
+          FORCE_TRAIN: 'False'
+          START_DATE: '20220101'
+          END_DATE: '20270101'
+          BATCH_SIZE: 1024
+          TRAIN_ITERATIONS: 100
+          MAX_SEQ_LEN: 10
+          COST_RATE: 0.0004
+          LAST_NDAYS: 50
+          HOLD_PERIOD: 11
+          ONLY_LONG: 'True'
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
+        run: python times_astock.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -d "margin_balance" ]; then
+            git add margin_balance/*.parquet
+            git diff --quiet && git diff --staged --quiet || (git commit -m "Update margin data [skip ci]" && git push)
+          fi
 
 jobs:
   analyze:
