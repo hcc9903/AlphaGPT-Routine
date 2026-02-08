@@ -1,10 +1,16 @@
 name: A-Stock AlphaGPT routine
 
 on:
-  schedule:
-    - cron: '13 8 * * *'
   workflow_dispatch:
-
+    inputs:
+      stock_code:
+        description: '输入股票代码'
+        required: true
+        default: '300912'
+      my_formula:
+        description: '输入你的黄金公式'
+        required: true
+        default: 'SUB(DIV(VOL_CHG, ABS(TREND)), TREND)'
 jobs:
   analyze:
     runs-on: ubuntu-latest
@@ -24,6 +30,9 @@ jobs:
 
       - name: Run analysis
         env:
+                INDEX_CODE: ${{ github.event.inputs.stock_code }}
+        BEST_FORMULA: ${{ github.event.inputs.my_formula }}
+        FORCE_TRAIN: false  # 强制关闭训练模式，直接运行公式
           CODE_FORMULA: ${{ github.event.inputs.code_formula || vars.CODE_FORMULA || secrets.CODE_FORMULA }}
           INDEX_CODE: ${{ vars.INDEX_CODE || secrets.INDEX_CODE || '600901' }}
           START_DATE: ${{ github.event.inputs.start_date || vars.START_DATE || '20220101' }}
