@@ -11,9 +11,14 @@ on:
         description: '输入你的黄金公式'
         required: true
         default: 'SUB(DIV(VOL_CHG, ABS(TREND)), TREND)'
+
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    # 授予写入权限，以便能把两融数据缓存推送到仓库
+    permissions:
+      contents: write
+      
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,33 +31,37 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install torch pandas numpy akshare matplotlib pyarrow tqdm
+          pip install torch pandas numpy akshare matplotlib pyarrow tqdm requests
 
       - name: Run analysis
         env:
-                INDEX_CODE: ${{ github.event.inputs.stock_code }}
-        BEST_FORMULA: ${{ github.event.inputs.my_formula }}
-        FORCE_TRAIN: false  # 强制关闭训练模式，直接运行公式
-          CODE_FORMULA: ${{ github.event.inputs.code_formula || vars.CODE_FORMULA || secrets.CODE_FORMULA }}
-          INDEX_CODE: ${{ vars.INDEX_CODE || secrets.INDEX_CODE || '600901' }}
-          START_DATE: ${{ github.event.inputs.start_date || vars.START_DATE || '20220101' }}
-          END_DATE: ${{ github.event.inputs.end_date || vars.END_DATE || '20270101' }}
-          BATCH_SIZE: ${{ vars.BATCH_SIZE || 1024 }}
-          TRAIN_ITERATIONS: ${{ vars.TRAIN_ITERATIONS || 100 }}
-          MAX_SEQ_LEN: ${{ vars.MAX_SEQ_LEN || 10 }}
-          COST_RATE: ${{ vars.COST_RATE || 0.0004 }}
-          LAST_NDAYS: ${{ vars.LAST_NDAYS || 50 }}
-          HOLD_PERIOD: ${{ vars.HOLD_PERIOD || 11 }}
-          FORCE_TRAIN: ${{ vars.FORCE_TRAIN || 'False' }}
-          ONLY_LONG: ${{ vars.ONLY_LONG || 'True' }}
-          BEST_FORMULA: ${{ vars.BEST_FORMULA || secrets.BEST_FORMULA || '' }}
-          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK || '' }}
-          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET || '' }}
+          # 核心：优先使用你手动输入的参数
+          INDEX_CODE: ${{ github.event.inputs.stock_code }}
+          BEST_FORMULA: ${{ github.event.inputs.my_formula }}
+          FORCE_TRAIN: 'False'  # 字符串形式，告诉 Python 直接运行公式
+          
+          # 其他辅助配置
+          START_DATE: '20220101'
+          END_DATE: '20270101'
+          BATCH_SIZE: 1024
+          TRAIN_ITERATIONS: 100
+          MAX_SEQ_LEN: 10
+          COST_RATE: 0.0004
+          LAST_NDAYS: 50
+          HOLD_PERIOD: 11
+          ONLY_LONG: 'True'
+          
+          # 敏感信息（需在仓库 Settings -> Secrets 里配置）
+          DINGTALK_WEBHOOK: ${{ secrets.DINGTALK_WEBHOOK }}
+          DINGTALK_SECRET: ${{ secrets.DINGTALK_SECRET }}
         run: python times_astock.py
 
       - name: Commit and push changes
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add margin_balance/*.parquet
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update margin data [skip ci]" && git push)
+          # 检查是否有两融数据更新，有则推送
+          if [ -d "margin_balance" ]; then
+            git add margin_balance/*.parquet
+            git diff --quiet && git diff --staged --quiet || (git commit -m "Update margin data [skip ci]" && git push)
+          fi
